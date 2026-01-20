@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, AlertTriangle, CheckCircle2, Clock, Eye, Download, LogOut, Users, TrendingUp, Activity } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle2, Clock, Eye, Download, LogOut, Users, TrendingUp, Activity, X } from 'lucide-react';
 
 interface ProfessorOverviewProps {
   onLogout: () => void;
@@ -227,10 +227,10 @@ export default function ProfessorOverview({ onLogout, userName }: ProfessorOverv
         <div className="max-w-[1600px] mx-auto px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">CE</span>
+              <span className="text-white font-bold text-lg">OS</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Code Exam Platform</h1>
+              <h1 className="text-xl font-bold text-gray-900">Operating Systems Exam Platform</h1>
               <p className="text-xs text-gray-500">Professor Dashboard</p>
             </div>
           </div>

@@ -60,7 +60,7 @@ const examCards: ExamCard[] = [
 ];
 
 const StatusBadge = ({ status, score }: { status: ExamStatus; score?: string }) => {
-  const configs = {
+  const configs: Record<ExamStatus, { icon: React.ElementType; text: string; className: string; animate?: boolean }> = {
     'ready': {
       icon: CheckCircle2,
       text: 'Ready to Start',

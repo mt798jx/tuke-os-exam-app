@@ -131,7 +131,7 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
               }
               return null;
             };
-            const first = findFirstFile(firstReadySelected.files ?? []);
+            const first = firstReadySelected?.files ? findFirstFile(firstReadySelected.files) : null;
             if (first) {
               setSelectedFile(first);
               const parts = first.path.split('/').slice(0, -1);
@@ -194,6 +194,15 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
       return;
     }
 
+    // Ensure a project is selected
+    if (!selectedProject) {
+      setUrlError('Prosím vyberte projekt');
+      return;
+    }
+
+    // Save selected id for stable references across awaits
+    const selectedId = selectedProject.id;
+
     // Save credentials to backend if checkbox is checked
     try {
       const gitlabApi = (await import('../lib/gitlabApi')).default;
@@ -203,10 +212,10 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
 
       // mark project cloning
       const updatedProjects = projects.map(p =>
-        p.id === selectedProject.id ? { ...p, status: 'cloning' as const, repoUrl: gitlabUrl } : p
+        p.id === selectedId ? { ...p, status: 'cloning' as const, repoUrl: gitlabUrl } : p
       );
       setProjects(updatedProjects);
-      setSelectedProject(updatedProjects.find(p => p.id === selectedProject.id)!);
+      setSelectedProject(updatedProjects.find(p => p.id === selectedId)!);
 
       // call backend to clone
       const res = await gitlabApi.cloneRepo(gitlabUrl, rememberCredentials ? undefined : gitlabUsername, rememberCredentials ? undefined : gitlabToken, USER_ID);
@@ -214,7 +223,7 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
       const clonedFiles: FileNode[] = res.files ?? [];
 
       const finalProjects = projects.map(p =>
-        p.id === selectedProject.id
+        p.id === selectedId
           ? {
               ...p,
               status: 'ready' as const,
@@ -229,7 +238,7 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
       );
       setProjects(finalProjects);
 
-      const finalSelected = finalProjects.find(p => p.id === selectedProject.id)!;
+      const finalSelected = finalProjects.find(p => p.id === selectedId)!;
       setSelectedProject(finalSelected);
       setGitlabUrl('');
 
@@ -265,10 +274,10 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
     } catch (e: any) {
       // mark error
       const finalProjects = projects.map(p =>
-        p.id === selectedProject.id ? { ...p, status: 'error' as const, errorMessage: e?.message ?? String(e) } : p
+        p.id === (selectedProject ? selectedProject.id : '') ? { ...p, status: 'error' as const, errorMessage: e?.message ?? String(e) } : p
       );
       setProjects(finalProjects);
-      setSelectedProject(finalProjects.find(p => p.id === selectedProject.id)!);
+      if (selectedProject) setSelectedProject(finalProjects.find(p => p.id === selectedProject.id)!);
     }
   };
 

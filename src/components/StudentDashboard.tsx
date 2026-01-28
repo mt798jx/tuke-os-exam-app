@@ -128,7 +128,7 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
           // Check if we have a matching repo for this exam type
           const hasMatchingRepo = repos.some((repo: any) => {
             const repoName = normalize(String(repo.name));
-            const cardType = normalize(card.id);
+            const cardType = normalize(String(card.id));
             return repoName.includes(cardType) || cardType.includes(repoName);
           });
           

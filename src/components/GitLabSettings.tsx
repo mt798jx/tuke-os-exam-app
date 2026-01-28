@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Key, User, Eye, EyeOff, Save, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import gitlabApi from '../lib/gitlabApi';
 
 export default function GitLabSettings() {
   const [gitlabUsername, setGitlabUsername] = useState('');
@@ -8,38 +9,54 @@ export default function GitLabSettings() {
   const [isSaved, setIsSaved] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
-  // Load saved credentials on component mount
+  // TODO: replace this with the real current user id from auth context
+  const USER_ID = 1;
+
   useEffect(() => {
-    const savedUsername = localStorage.getItem('gitlab_username');
-    const savedToken = localStorage.getItem('gitlab_token');
-    if (savedUsername && savedToken) {
-      setGitlabUsername(savedUsername);
-      setGitlabToken(savedToken);
-      setIsSaved(true);
+    let mounted = true;
+    async function load() {
+      try {
+        const creds = await gitlabApi.getCredentials(USER_ID);
+        if (!mounted) return;
+        if (creds && (creds.gitlab_username || creds.gitlab_token)) {
+          setGitlabUsername(creds.gitlab_username ?? '');
+          setGitlabToken(creds.gitlab_token ?? '');
+          setIsSaved(Boolean(creds.gitlab_username && creds.gitlab_token));
+        }
+      } catch (e) {
+        // ignore errors for now
+      }
     }
+    load();
+    return () => { mounted = false; };
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!gitlabUsername.trim() || !gitlabToken.trim()) {
       setSaveMessage('Prosím vyplňte všetky polia');
       setTimeout(() => setSaveMessage(''), 3000);
       return;
     }
-
-    localStorage.setItem('gitlab_username', gitlabUsername);
-    localStorage.setItem('gitlab_token', gitlabToken);
-    setIsSaved(true);
-    setSaveMessage('Prihlasovacie údaje boli úspešne uložené');
+    try {
+      await gitlabApi.saveCredentials(USER_ID, gitlabUsername, gitlabToken);
+      setIsSaved(true);
+      setSaveMessage('Prihlasovacie údaje boli úspešne uložené');
+    } catch (e) {
+      setSaveMessage('Uloženie zlyhalo');
+    }
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
-  const handleClear = () => {
-    localStorage.removeItem('gitlab_username');
-    localStorage.removeItem('gitlab_token');
-    setGitlabUsername('');
-    setGitlabToken('');
-    setIsSaved(false);
-    setSaveMessage('Prihlasovacie údaje boli odstránené');
+  const handleClear = async () => {
+    try {
+      await gitlabApi.deleteCredentials(USER_ID);
+      setGitlabUsername('');
+      setGitlabToken('');
+      setIsSaved(false);
+      setSaveMessage('Prihlasovacie údaje boli odstránené');
+    } catch (e) {
+      setSaveMessage('Vymazanie zlyhalo');
+    }
     setTimeout(() => setSaveMessage(''), 3000);
   };
 

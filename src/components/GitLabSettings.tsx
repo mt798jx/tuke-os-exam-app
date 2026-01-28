@@ -41,6 +41,12 @@ export default function GitLabSettings() {
       await gitlabApi.saveCredentials(USER_ID, gitlabUsername, gitlabToken);
       setIsSaved(true);
       setSaveMessage('Prihlasovacie údaje boli úspešne uložené');
+      // notify other components that credentials changed
+      try {
+        window.dispatchEvent(new CustomEvent('gitlabCredentialsChanged', { detail: { gitlab_username: gitlabUsername, gitlab_token: gitlabToken } }));
+      } catch (e) {
+        // ignore in non-browser environments
+      }
     } catch (e) {
       setSaveMessage('Uloženie zlyhalo');
     }
@@ -54,6 +60,12 @@ export default function GitLabSettings() {
       setGitlabToken('');
       setIsSaved(false);
       setSaveMessage('Prihlasovacie údaje boli odstránené');
+      // notify other components that credentials were cleared
+      try {
+        window.dispatchEvent(new CustomEvent('gitlabCredentialsChanged', { detail: { gitlab_username: '', gitlab_token: '' } }));
+      } catch (e) {
+        // ignore in non-browser environments
+      }
     } catch (e) {
       setSaveMessage('Vymazanie zlyhalo');
     }

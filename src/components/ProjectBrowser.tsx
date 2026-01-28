@@ -46,7 +46,7 @@ const initialProjects: Project[] = [
 
 type NavView = 'exams' | 'grades' | 'projects' | 'settings';
 
-export default function ProjectBrowser({ onNavigate }: { onNavigate?: (view: NavView) => void } ) {
+export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?: (view: NavView) => void, activeView?: NavView } ) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [selectedProject, setSelectedProject] = useState<Project>(initialProjects[0]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'include']));
@@ -61,9 +61,10 @@ export default function ProjectBrowser({ onNavigate }: { onNavigate?: (view: Nav
   // TODO: replace with auth context in future
   const USER_ID = 1;
 
-  // Load saved credentials from backend on mount
+  // Load credentials and discover repos whenever the Projects view becomes active
   useEffect(() => {
     let mounted = true;
+    if (activeView !== 'projects') return;
     (async () => {
       try {
         const { getCredentials, getTree, getRepos } = await import('../lib/gitlabApi');
@@ -135,6 +136,21 @@ export default function ProjectBrowser({ onNavigate }: { onNavigate?: (view: Nav
       }
     })();
     return () => { mounted = false; };
+  }, [activeView]);
+
+  // Listen for credential changes made in Settings and update local state immediately
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const detail = ce?.detail || {};
+      setGitlabUsername(detail.gitlab_username ?? '');
+      setGitlabToken(detail.gitlab_token ?? '');
+      setRememberCredentials(Boolean(detail.gitlab_username && detail.gitlab_token));
+    };
+    window.addEventListener('gitlabCredentialsChanged', handler as EventListener);
+    return () => {
+      window.removeEventListener('gitlabCredentialsChanged', handler as EventListener);
+    };
   }, []);
 
   const validateGitLabUrl = (url: string): boolean => {

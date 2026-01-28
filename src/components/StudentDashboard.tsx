@@ -452,7 +452,9 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
         )}
 
         {activeView === 'grades' && <GradesView />}
-        {activeView === 'projects' && <ProjectBrowser />}
+        <div style={{ display: activeView === 'projects' ? 'block' : 'none' }}>
+          <ProjectBrowser onNavigate={(v) => setActiveView(v)} />
+        </div>
         {activeView === 'settings' && <GitLabSettings />}
       </main>
     </div>

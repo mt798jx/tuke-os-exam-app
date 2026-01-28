@@ -48,3 +48,27 @@ export async function cloneRepo(gitlabUrl: string, username?: string, token?: st
 }
 
 export default { saveCredentials, getCredentials, deleteCredentials, cloneRepo };
+
+export async function getTree(repoName: string) {
+  const res = await fetch(`${API_BASE}/tree/${encodeURIComponent(repoName)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to fetch tree: ${res.status}`);
+  return await res.json();
+}
+
+export async function getRepos(userId: number) {
+  const res = await fetch(`${API_BASE}/repos?user_id=${encodeURIComponent(String(userId))}`);
+  if (!res.ok) throw new Error(`Failed to fetch repos: ${res.status}`);
+  return await res.json();
+}
+
+export async function deleteRepo(userId: number, repoName: string) {
+  const url = `${API_BASE}/repos?user_id=${encodeURIComponent(String(userId))}&repo_name=${encodeURIComponent(repoName)}`;
+  const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Failed to delete repo: ${res.status} ${txt}`);
+  }
+  return await res.json();
+}
+

@@ -18,6 +18,8 @@ interface Project {
   displayName: string;
   type: 'ipc' | 'copymaster';
   repoUrl?: string;
+  repoPath?: string;
+  repoFolder?: string;
   lastSync?: string;
   branch?: string;
   status: 'not-configured' | 'cloning' | 'ready' | 'error';
@@ -42,136 +44,9 @@ const initialProjects: Project[] = [
   }
 ];
 
-// Sample files for demo purposes
-const sampleIPCFiles: FileNode[] = [
-  {
-    name: 'src',
-    type: 'folder',
-    path: 'src',
-    children: [
-      {
-        name: 'main.c',
-        type: 'file',
-        path: 'src/main.c',
-        size: '2.4 KB',
-        lastModified: '2024-01-18',
-        language: 'c',
-        content: `#include <stdio.h>\n#include "ipc.h"\n\nint main(int argc, char *argv[]) {\n    printf("IPC Assignment - Main\\n");\n    \n    // Initialize IPC mechanisms\n    init_shared_memory();\n    init_message_queue();\n    \n    return 0;\n}`
-      },
-      {
-        name: 'shared_memory.c',
-        type: 'file',
-        path: 'src/shared_memory.c',
-        size: '3.8 KB',
-        lastModified: '2024-01-19',
-        language: 'c',
-        content: `#include <sys/ipc.h>\n#include <sys/shm.h>\n#include "ipc.h"\n\n#define SHM_SIZE 1024\n\nint init_shared_memory() {\n    key_t key = ftok("shmfile", 65);\n    int shmid = shmget(key, SHM_SIZE, 0666|IPC_CREAT);\n    return shmid;\n}`
-      },
-      {
-        name: 'message_queue.c',
-        type: 'file',
-        path: 'src/message_queue.c',
-        size: '2.1 KB',
-        lastModified: '2024-01-17',
-        language: 'c'
-      },
-      {
-        name: 'semaphore.c',
-        type: 'file',
-        path: 'src/semaphore.c',
-        size: '1.9 KB',
-        lastModified: '2024-01-16',
-        language: 'c'
-      }
-    ]
-  },
-  {
-    name: 'include',
-    type: 'folder',
-    path: 'include',
-    children: [
-      {
-        name: 'ipc.h',
-        type: 'file',
-        path: 'include/ipc.h',
-        size: '0.8 KB',
-        lastModified: '2024-01-15',
-        language: 'c',
-        content: `#ifndef IPC_H\n#define IPC_H\n\nint init_shared_memory();\nint init_message_queue();\nvoid cleanup_ipc();\n\n#endif`
-      }
-    ]
-  },
-  {
-    name: 'Makefile',
-    type: 'file',
-    path: 'Makefile',
-    size: '0.5 KB',
-    lastModified: '2024-01-14',
-    content: `CC=gcc\nCFLAGS=-Wall -Wextra\n\nall: ipc_main\n\nipc_main: src/*.c\n\t$(CC) $(CFLAGS) -o ipc_main src/*.c`
-  },
-  {
-    name: 'README.md',
-    type: 'file',
-    path: 'README.md',
-    size: '1.2 KB',
-    lastModified: '2024-01-13',
-    content: `# IPC Programming Assignment\n\nImplementation of Inter-Process Communication mechanisms.\n\n## Features\n- Shared Memory\n- Message Queues\n- Semaphores`
-  }
-];
+type NavView = 'exams' | 'grades' | 'projects' | 'settings';
 
-const sampleCopyMasterFiles: FileNode[] = [
-  {
-    name: 'src',
-    type: 'folder',
-    path: 'src',
-    children: [
-      {
-        name: 'copy.c',
-        type: 'file',
-        path: 'src/copy.c',
-        size: '4.2 KB',
-        lastModified: '2024-01-18',
-        language: 'c',
-        content: `#include <stdio.h>\n#include <stdlib.h>\n#include <fcntl.h>\n#include <unistd.h>\n\n#define BUFFER_SIZE 4096\n\nint copy_file(const char *src, const char *dest) {\n    int src_fd = open(src, O_RDONLY);\n    int dest_fd = open(dest, O_WRONLY | O_CREAT, 0644);\n    \n    char buffer[BUFFER_SIZE];\n    ssize_t bytes_read;\n    \n    while ((bytes_read = read(src_fd, buffer, BUFFER_SIZE)) > 0) {\n        write(dest_fd, buffer, bytes_read);\n    }\n    \n    close(src_fd);\n    close(dest_fd);\n    return 0;\n}`
-      },
-      {
-        name: 'main.c',
-        type: 'file',
-        path: 'src/main.c',
-        size: '1.5 KB',
-        lastModified: '2024-01-17',
-        language: 'c',
-        content: `#include <stdio.h>\n#include "copy.h"\n\nint main(int argc, char *argv[]) {\n    if (argc != 3) {\n        printf("Usage: copymaster <source> <dest>\\n");\n        return 1;\n    }\n    \n    return copy_file(argv[1], argv[2]);\n}`
-      }
-    ]
-  },
-  {
-    name: 'include',
-    type: 'folder',
-    path: 'include',
-    children: [
-      {
-        name: 'copy.h',
-        type: 'file',
-        path: 'include/copy.h',
-        size: '0.4 KB',
-        lastModified: '2024-01-16',
-        language: 'c',
-        content: `#ifndef COPY_H\n#define COPY_H\n\nint copy_file(const char *src, const char *dest);\n\n#endif`
-      }
-    ]
-  },
-  {
-    name: 'README.md',
-    type: 'file',
-    path: 'README.md',
-    size: '0.9 KB',
-    lastModified: '2024-01-15',
-    content: `# CopyMaster Assignment\n\nAdvanced file copy utility with system calls.\n\n## Features\n- Low-level file operations\n- Error handling\n- Buffer management`
-  }
-];
-
-export default function ProjectBrowser() {
+export default function ProjectBrowser({ onNavigate }: { onNavigate?: (view: NavView) => void } ) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [selectedProject, setSelectedProject] = useState<Project>(initialProjects[0]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'include']));
@@ -183,15 +58,83 @@ export default function ProjectBrowser() {
   const [showToken, setShowToken] = useState(false);
   const [urlError, setUrlError] = useState('');
 
-  // Load saved credentials on component mount
+  // TODO: replace with auth context in future
+  const USER_ID = 1;
+
+  // Load saved credentials from backend on mount
   useEffect(() => {
-    const savedUsername = localStorage.getItem('gitlab_username');
-    const savedToken = localStorage.getItem('gitlab_token');
-    if (savedUsername && savedToken) {
-      setGitlabUsername(savedUsername);
-      setGitlabToken(savedToken);
-      setRememberCredentials(true);
-    }
+    let mounted = true;
+    (async () => {
+      try {
+        const { getCredentials, getTree, getRepos } = await import('../lib/gitlabApi');
+        const creds = await getCredentials(USER_ID);
+        if (!mounted) return;
+        if (creds && (creds.gitlab_username || creds.gitlab_token)) {
+          setGitlabUsername(creds.gitlab_username ?? '');
+          setGitlabToken(creds.gitlab_token ?? '');
+          setRememberCredentials(Boolean(creds.gitlab_username && creds.gitlab_token));
+        }
+        // Discover repos on the server and map them to our initial projects.
+        let newProjects = [...initialProjects];
+        let firstReadySelected: Project | null = null;
+        const repos = await getRepos(USER_ID); // [{name, path}, ...]
+        const checks = await Promise.all(repos.map(async (r: any) => {
+          try {
+            const tree = await getTree(r.name);
+            if (tree && Array.isArray(tree) && tree.length > 0) {
+              return { repo: r, files: tree };
+            }
+          } catch (err) {
+            // ignore individual failures
+          }
+          return null;
+        }));
+
+        // Apply results to projects state by attempting to match repo names to initial projects
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (const r of checks) {
+          if (!r) continue;
+          const repoName: string = String(r.repo.name);
+          let matched = newProjects.find(p => p.name === repoName);
+          if (!matched) matched = newProjects.find(p => repoName.includes(normalize(p.name)) || normalize(p.name).includes(repoName));
+          if (!matched) matched = newProjects.find(p => repoName.includes(p.type));
+          if (matched) {
+            const repoPath = r.repo?.path ?? undefined;
+            const repoFolder = repoPath ? String(repoPath).split('/').pop() : undefined;
+            newProjects = newProjects.map(p => p.id === matched!.id ? { ...p, status: 'ready' as const, files: r.files, repoUrl: (r.repo?.repo_url ?? p.repoUrl), repoPath, repoFolder } : p);
+            if (!firstReadySelected) firstReadySelected = newProjects.find(p => p.id === matched!.id)!;
+          }
+        }
+        if (mounted) {
+          setProjects(newProjects);
+          if (firstReadySelected) {
+            setSelectedProject(firstReadySelected);
+            // auto-select first file
+            const findFirstFile = (nodes: FileNode[]): FileNode | null => {
+              for (const n of nodes) {
+                if (n.type === 'file') return n;
+                if (n.type === 'folder' && n.children) {
+                  const found = findFirstFile(n.children);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            const first = findFirstFile(firstReadySelected.files ?? []);
+            if (first) {
+              setSelectedFile(first);
+              const parts = first.path.split('/').slice(0, -1);
+              const prefixes: string[] = [];
+              for (let i = 0; i < parts.length; i++) prefixes.push(parts.slice(0, i + 1).join('/'));
+              setExpandedFolders(new Set(prefixes.length ? prefixes : ['src', 'include']));
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const validateGitLabUrl = (url: string): boolean => {
@@ -200,7 +143,7 @@ export default function ProjectBrowser() {
     return gitlabPattern.test(url) || url.includes('gitlab.com') || url.includes('git.kpi.fei.tuke.sk') || url.includes('git.tuke.sk');
   };
 
-  const handleCloneProject = () => {
+  const handleCloneProject = async () => {
     setUrlError('');
     
     if (!gitlabUrl.trim()) {
@@ -223,48 +166,79 @@ export default function ProjectBrowser() {
       return;
     }
 
-    // Save credentials if checkbox is checked
-    if (rememberCredentials) {
-      localStorage.setItem('gitlab_username', gitlabUsername);
-      localStorage.setItem('gitlab_token', gitlabToken);
-    } else {
-      localStorage.removeItem('gitlab_username');
-      localStorage.removeItem('gitlab_token');
-    }
+    // Save credentials to backend if checkbox is checked
+    try {
+      const gitlabApi = (await import('../lib/gitlabApi')).default;
+      if (rememberCredentials) {
+        await gitlabApi.saveCredentials(USER_ID, gitlabUsername, gitlabToken);
+      }
 
-    // Update project to cloning status
-    const updatedProjects = projects.map(p => 
-      p.id === selectedProject.id 
-        ? { ...p, status: 'cloning' as const, repoUrl: gitlabUrl }
-        : p
-    );
-    setProjects(updatedProjects);
-    const updatedSelected = updatedProjects.find(p => p.id === selectedProject.id)!;
-    setSelectedProject(updatedSelected);
+      // mark project cloning
+      const updatedProjects = projects.map(p =>
+        p.id === selectedProject.id ? { ...p, status: 'cloning' as const, repoUrl: gitlabUrl } : p
+      );
+      setProjects(updatedProjects);
+      setSelectedProject(updatedProjects.find(p => p.id === selectedProject.id)!);
 
-    // Simulate cloning process
-    setTimeout(() => {
-      const now = new Date();
-      const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      
-      const finalProjects = projects.map(p => 
-        p.id === selectedProject.id 
-          ? { 
-              ...p, 
-              status: 'ready' as const, 
-              repoUrl: gitlabUrl,
-              lastSync: formattedDate,
-              branch: 'main',
-              files: p.type === 'ipc' ? sampleIPCFiles : sampleCopyMasterFiles
+      // call backend to clone
+      const res = await gitlabApi.cloneRepo(gitlabUrl, rememberCredentials ? undefined : gitlabUsername, rememberCredentials ? undefined : gitlabToken, USER_ID);
+
+      const clonedFiles: FileNode[] = res.files ?? [];
+
+      const finalProjects = projects.map(p =>
+        p.id === selectedProject.id
+          ? {
+              ...p,
+              status: 'ready' as const,
+              repoUrl: res.repo_url ?? gitlabUrl,
+              lastSync: res.lastSync ?? new Date().toISOString(),
+              branch: res.branch ?? 'main',
+              files: clonedFiles,
+              repoPath: `${USER_ID}/${res.repo_name}`,
+              repoFolder: res.repo_name,
             }
           : p
       );
       setProjects(finalProjects);
+
       const finalSelected = finalProjects.find(p => p.id === selectedProject.id)!;
       setSelectedProject(finalSelected);
       setGitlabUrl('');
-      setExpandedFolders(new Set(['src', 'include']));
-    }, 2000);
+
+      // If we have files returned, expand folders and auto-select the first file for preview
+      const findFirstFile = (nodes: FileNode[]): FileNode | null => {
+        for (const n of nodes) {
+          if (n.type === 'file') return n;
+          if (n.type === 'folder' && n.children) {
+            const found = findFirstFile(n.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const first = findFirstFile(clonedFiles);
+      if (first) {
+        setSelectedFile(first);
+        // build expanded folder set from file path prefixes
+        const parts = first.path.split('/').slice(0, -1); // exclude filename
+        const prefixes: string[] = [];
+        for (let i = 0; i < parts.length; i++) {
+          prefixes.push(parts.slice(0, i + 1).join('/'));
+        }
+        setExpandedFolders(new Set(prefixes.length ? prefixes : ['src', 'include']));
+      } else {
+        setExpandedFolders(new Set(['src', 'include']));
+        setSelectedFile(null);
+      }
+    } catch (e: any) {
+      // mark error
+      const finalProjects = projects.map(p =>
+        p.id === selectedProject.id ? { ...p, status: 'error' as const, errorMessage: e?.message ?? String(e) } : p
+      );
+      setProjects(finalProjects);
+      setSelectedProject(finalProjects.find(p => p.id === selectedProject.id)!);
+    }
   };
 
   const toggleFolder = (path: string) => {
@@ -362,9 +336,10 @@ export default function ProjectBrowser() {
 
       {/* Not Configured State */}
       {selectedProject.status === 'not-configured' && (() => {
-        const savedUsername = localStorage.getItem('gitlab_username');
-        const savedToken = localStorage.getItem('gitlab_token');
-        const hasCredentials = savedUsername && savedToken;
+        // Credentials are loaded into component state from backend on mount
+        const savedUsername = gitlabUsername || '';
+        const savedToken = gitlabToken || '';
+        const hasCredentials = Boolean(savedUsername && savedToken);
 
         return (
           <div className="bg-white border-2 border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
@@ -394,7 +369,10 @@ export default function ProjectBrowser() {
                       </p>
                     </div>
                     <button
-                      onClick={() => window.location.hash = '#settings'}
+                      onClick={() => {
+                        if (onNavigate) return onNavigate('settings');
+                        window.location.hash = '#settings';
+                      }}
                       className="flex items-center gap-1 px-3 py-1.5 bg-white text-green-700 border-2 border-green-300 rounded-lg hover:bg-green-50 transition-all font-semibold text-xs"
                     >
                       <SettingsIcon className="w-3 h-3" />
@@ -608,7 +586,18 @@ export default function ProjectBrowser() {
                   <span className="sm:hidden">GitLab</span>
                 </a>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    // attempt to delete repo on server
+                    try {
+                      const { deleteRepo } = await import('../lib/gitlabApi');
+                      const repoNameToDelete = selectedProject.repoFolder ?? (selectedProject.repoPath ? String(selectedProject.repoPath).split('/').pop() : selectedProject.name);
+                      await deleteRepo(USER_ID, repoNameToDelete ?? selectedProject.name);
+                    } catch (err: any) {
+                      // show error briefly (for now, console)
+                      console.error('Failed to delete repo', err);
+                      // still continue to remove from UI
+                    }
+
                     const updatedProjects = projects.map(p => 
                       p.id === selectedProject.id 
                         ? { ...p, status: 'not-configured' as const, repoUrl: undefined, files: undefined, lastSync: undefined, branch: undefined }

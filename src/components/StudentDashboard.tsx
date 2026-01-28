@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Github, LogOut, CheckCircle2, Clock, AlertCircle, Code2, BookOpen, Loader2, Award, FolderOpen, Menu, X as CloseIcon, GitBranch, Settings as SettingsIcon } from 'lucide-react';
+import { Github, LogOut, CheckCircle2, Clock, AlertCircle, Code2, BookOpen, Loader2, Award, FolderOpen, Lock, Menu, X as CloseIcon, GitBranch, Settings as SettingsIcon } from 'lucide-react';
 import { ExamMode } from '../App';
 import GradesView from './GradesView';
 import ProjectBrowser from './ProjectBrowser';
@@ -11,7 +11,7 @@ interface StudentDashboardProps {
   userName: string;
 }
 
-type ExamStatus = 'ready' | 'analyzing' | 'in-progress' | 'completed';
+type ExamStatus = 'ready' | 'analyzing' | 'in-progress' | 'completed' | 'disabled';
 type ActiveView = 'exams' | 'grades' | 'projects' | 'settings';
 
 interface ExamCard {
@@ -34,7 +34,7 @@ const initialExamCards: ExamCard[] = [
     title: 'IPC Programming Assignment',
     shortTitle: 'IPC Assignment',
     description: 'Inter-Process Communication system implementation. The AI examiner will analyze your repository and ask detailed questions about shared memory, message queues, and synchronization patterns.',
-    status: 'ready',
+    status: 'disabled',
     requiresProject: true,
     projectConfigured: false,
     estimatedTime: '30-45 min',
@@ -85,6 +85,11 @@ const StatusBadge = ({ status, score }: { status: ExamStatus; score?: string }) 
       icon: CheckCircle2,
       text: score || 'Completed',
       className: 'bg-gray-50 text-gray-700 border-gray-300'
+    },
+    'disabled': {
+      icon: Lock,
+      text: 'Unavailable',
+      className: 'bg-gray-100 text-gray-600 border-gray-200'
     }
   };
 
@@ -472,12 +477,13 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
                         {(!exam.requiresProject || exam.projectConfigured) && (
                           <button
                             onClick={() => onStartExam(exam.id)}
-                            disabled={exam.status === 'analyzing'}
+                            disabled={exam.status === 'analyzing' || exam.status === 'disabled'}
                             className="px-6 sm:px-8 py-3 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-xl font-bold hover:from-[#D4951A] hover:to-[#C4851A] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl text-sm sm:text-base"
                           >
                             {exam.status === 'in-progress' ? 'Continue Exam' : 
                              exam.status === 'analyzing' ? 'Please Wait...' : 
-                             exam.status === 'completed' ? 'Review Exam' : 'Start Exam'}
+                             exam.status === 'completed' ? 'Review Exam' : 
+                             exam.status === 'disabled' ? 'Unavailable' : 'Start Exam'}
                           </button>
                         )}
                         {exam.status === 'analyzing' && (

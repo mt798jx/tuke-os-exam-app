@@ -23,7 +23,7 @@ export default function WelcomePage({ onLogin }: WelcomePageProps) {
 
     setIsLoading(true);
     
-    // Simulate API call - replace with actual Tukey Auth
+    // Simulate API call - replace with actual Tuke Auth
     setTimeout(() => {
       // Mock successful login
       const mockName = selectedRole === 'student' ? 'Alex Chen' : 'Dr. Sarah Mitchell';
@@ -247,7 +247,7 @@ export default function WelcomePage({ onLogin }: WelcomePageProps) {
 
                   <div className="text-center pt-4 border-t border-gray-200">
                     <p className="text-sm text-gray-500">
-                      Protected by Tukey Auth • <a href="#" className="text-[#E5A712] hover:underline font-semibold">Need help?</a>
+                      Protected by Tuke Auth • <a href="#" className="text-[#E5A712] hover:underline font-semibold">Need help?</a>
                     </p>
                   </div>
                 </div>

@@ -57,6 +57,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
   const [rememberCredentials, setRememberCredentials] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [urlError, setUrlError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   // TODO: replace with auth context in future
   const USER_ID = 1;
@@ -65,6 +66,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
   useEffect(() => {
     let mounted = true;
     if (activeView !== 'projects') return;
+    setIsLoading(true);
     (async () => {
       try {
         const { getCredentials, getTree, getRepos } = await import('../lib/gitlabApi');
@@ -130,9 +132,11 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
               setExpandedFolders(new Set(prefixes.length ? prefixes : ['src', 'include']));
             }
           }
+          setIsLoading(false);
         }
       } catch (e) {
         // ignore
+        setIsLoading(false);
       }
     })();
     return () => { mounted = false; };
@@ -351,7 +355,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       </div>
 
       {/* Not Configured State */}
-      {selectedProject.status === 'not-configured' && (() => {
+      {!isLoading && selectedProject.status === 'not-configured' && (() => {
         // Credentials are loaded into component state from backend on mount
         const savedUsername = gitlabUsername || '';
         const savedToken = gitlabToken || '';

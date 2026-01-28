@@ -46,9 +46,9 @@ const initialProjects: Project[] = [
 
 type NavView = 'exams' | 'grades' | 'projects' | 'settings';
 
-export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?: (view: NavView) => void, activeView?: NavView } ) {
+export default function ProjectBrowser({ onNavigate, activeView, focusType }: { onNavigate?: (view: NavView) => void, activeView?: NavView, focusType?: string } ) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [selectedProject, setSelectedProject] = useState<Project>(initialProjects[0]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'include']));
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
   const [gitlabUrl, setGitlabUrl] = useState('');
@@ -110,8 +110,16 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
         }
         if (mounted) {
           setProjects(newProjects);
-          if (firstReadySelected) {
-            setSelectedProject(firstReadySelected);
+          // Select project based on focusType if provided
+          let toSelect: Project | null = null;
+          if (focusType) {
+            // focusType provided - select that specific project
+            toSelect = newProjects.find(p => p.type === focusType) ?? null;
+          }
+          // If no focusType, don't auto-select anything - let user choose
+          
+          if (toSelect) {
+            setSelectedProject(toSelect);
             // auto-select first file
             const findFirstFile = (nodes: FileNode[]): FileNode | null => {
               for (const n of nodes) {
@@ -140,7 +148,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       }
     })();
     return () => { mounted = false; };
-  }, [activeView]);
+  }, [activeView, focusType]);
 
   // Listen for credential changes made in Settings and update local state immediately
   useEffect(() => {
@@ -224,6 +232,9 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       const finalSelected = finalProjects.find(p => p.id === selectedProject.id)!;
       setSelectedProject(finalSelected);
       setGitlabUrl('');
+
+      // Notify other components that a repo was cloned
+      window.dispatchEvent(new CustomEvent('repoCloned', { detail: { projectType: finalSelected.type } }));
 
       // If we have files returned, expand folders and auto-select the first file for preview
       const findFirstFile = (nodes: FileNode[]): FileNode | null => {
@@ -335,7 +346,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
               setUrlError('');
             }}
             className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all text-sm sm:text-base relative ${
-              selectedProject.id === project.id
+              selectedProject?.id === project.id
                 ? 'bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black shadow-lg'
                 : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-[#E5A712]'
             }`}
@@ -355,7 +366,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       </div>
 
       {/* Not Configured State */}
-      {!isLoading && selectedProject.status === 'not-configured' && (() => {
+      {!isLoading && selectedProject && selectedProject.status === 'not-configured' && (() => {
         // Credentials are loaded into component state from backend on mount
         const savedUsername = gitlabUsername || '';
         const savedToken = gitlabToken || '';
@@ -550,7 +561,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       })()}
 
       {/* Cloning State */}
-      {selectedProject.status === 'cloning' && (
+      {selectedProject && selectedProject.status === 'cloning' && (
         <div className="bg-white border-2 border-gray-200 rounded-xl p-8 sm:p-12 shadow-sm">
           <div className="max-w-md mx-auto text-center">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[#E5A712] to-[#D4951A] rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -573,7 +584,7 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       )}
 
       {/* Ready State - Show File Browser */}
-      {selectedProject.status === 'ready' && selectedProject.files && (
+      {selectedProject && selectedProject.status === 'ready' && selectedProject.files && (
         <>
           {/* Project Info */}
           <div className="bg-white border-2 border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm">
@@ -624,8 +635,12 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
                         : p
                     );
                     setProjects(updatedProjects);
-                    setSelectedProject(updatedProjects.find(p => p.id === selectedProject.id)!);
+                    const updatedSelected = updatedProjects.find(p => p.id === selectedProject.id)!;
+                    setSelectedProject(updatedSelected);
                     setSelectedFile(null);
+                    
+                    // Notify other components that a repo was deleted
+                    window.dispatchEvent(new CustomEvent('repoDeleted', { detail: { projectType: updatedSelected.type } }));
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-sm whitespace-nowrap"
                 >

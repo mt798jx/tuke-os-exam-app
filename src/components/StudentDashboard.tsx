@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Github, LogOut, CheckCircle2, Clock, AlertCircle, Code2, BookOpen, Loader2, Award, FolderOpen, Menu, X as CloseIcon, GitBranch, Settings as SettingsIcon } from 'lucide-react';
 import { ExamMode } from '../App';
 import GradesView from './GradesView';
@@ -28,7 +28,7 @@ interface ExamCard {
   icon: React.ElementType;
 }
 
-const examCards: ExamCard[] = [
+const initialExamCards: ExamCard[] = [
   {
     id: 'ipc',
     title: 'IPC Programming Assignment',
@@ -102,6 +102,61 @@ const StatusBadge = ({ status, score }: { status: ExamStatus; score?: string }) 
 export default function StudentDashboard({ onStartExam, onLogout, userName }: StudentDashboardProps) {
   const [activeView, setActiveView] = useState<ActiveView>('exams');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [examCards, setExamCards] = useState<ExamCard[]>(initialExamCards);
+  const [projectsFocus, setProjectsFocus] = useState<string | null>(null);
+
+  // TODO: replace with auth context in future
+  const USER_ID = 1;
+
+  // Detect cloned repos and update projectConfigured status
+  useEffect(() => {
+    let mounted = true;
+    
+    const checkRepos = async () => {
+      try {
+        const { getRepos } = await import('../lib/gitlabApi');
+        const repos = await getRepos(USER_ID);
+        if (!mounted) return;
+
+        // Normalize repo name for comparison
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        // Update exam cards based on detected repos
+        const updatedCards = initialExamCards.map(card => {
+          if (!card.requiresProject) return card;
+          
+          // Check if we have a matching repo for this exam type
+          const hasMatchingRepo = repos.some((repo: any) => {
+            const repoName = normalize(String(repo.name));
+            const cardType = normalize(card.id);
+            return repoName.includes(cardType) || cardType.includes(repoName);
+          });
+          
+          return { ...card, projectConfigured: hasMatchingRepo };
+        });
+        
+        setExamCards(updatedCards);
+      } catch (e) {
+        // Ignore errors - will show not configured
+      }
+    };
+    
+    // Check on mount
+    checkRepos();
+    
+    // Listen for repo clone/delete events and re-check
+    const handleRepoChange = () => {
+      checkRepos();
+    };
+    window.addEventListener('repoCloned', handleRepoChange);
+    window.addEventListener('repoDeleted', handleRepoChange);
+    
+    return () => { 
+      mounted = false;
+      window.removeEventListener('repoCloned', handleRepoChange);
+      window.removeEventListener('repoDeleted', handleRepoChange);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -143,7 +198,10 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
                 Grades
               </button>
               <button
-                onClick={() => setActiveView('projects')}
+                onClick={() => {
+                  setProjectsFocus(null);
+                  setActiveView('projects');
+                }}
                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
                   activeView === 'projects'
                     ? 'bg-black text-[#E5A712]'
@@ -223,6 +281,7 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
               </button>
               <button
                 onClick={() => {
+                  setProjectsFocus(null);
                   setActiveView('projects');
                   setMobileMenuOpen(false);
                 }}
@@ -362,7 +421,10 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
                                 Pre spustenie tejto skúšky musíte najprv naklonovat váš GitLab repozitár v sekcii Projects.
                               </p>
                               <button
-                                onClick={() => setActiveView('projects')}
+                                onClick={() => {
+                                  setProjectsFocus(exam.id);
+                                  setActiveView('projects');
+                                }}
                                 className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all font-bold text-sm"
                               >
                                 <GitBranch className="w-4 h-4" />
@@ -382,7 +444,10 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
                             <p className="text-sm font-bold text-green-900">Nakonfigurovaný a pripravený</p>
                           </div>
                           <button
-                            onClick={() => setActiveView('projects')}
+                            onClick={() => {
+                              setProjectsFocus(exam.id);
+                              setActiveView('projects');
+                            }}
                             className="flex items-center gap-2 px-3 py-1.5 bg-white text-green-700 border-2 border-green-300 rounded-lg hover:bg-green-50 transition-all font-semibold text-xs"
                           >
                             <FolderOpen className="w-3 h-3" />
@@ -452,7 +517,7 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
         )}
 
         {activeView === 'grades' && <GradesView />}
-        {activeView === 'projects' && <ProjectBrowser activeView={activeView} onNavigate={(v) => setActiveView(v)} />}
+        {activeView === 'projects' && <ProjectBrowser activeView={activeView} onNavigate={(v) => setActiveView(v)} focusType={projectsFocus ?? undefined} />}
         {activeView === 'settings' && <GitLabSettings />}
       </main>
     </div>

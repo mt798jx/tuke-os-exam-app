@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Users, Save, ArrowLeft, Calendar, Clock, MapPin, X } from 'lucide-react';
+import StudentDetailView from './StudentDetailView';
 
 interface LabGroup {
   id: string;
@@ -8,7 +9,16 @@ interface LabGroup {
   time: string;
   room: string;
   studentCount: number;
-  students: string[];
+  students: StudentInGroup[];
+}
+
+interface StudentInGroup {
+  id: string;
+  name: string;
+  email: string;
+  status: 'active' | 'inactive';
+  completedExams: number;
+  totalExams: number;
 }
 
 interface GroupManagementProps {
@@ -24,7 +34,11 @@ export default function GroupManagement({ onClose }: GroupManagementProps) {
       time: '14:00-16:00',
       room: 'LAB-101',
       studentCount: 15,
-      students: ['1', '2', '3']
+      students: [
+        { id: '1', name: 'Ján Novák', email: 'jan.novak@tuke.sk', status: 'active', completedExams: 2, totalExams: 3 },
+        { id: '2', name: 'Mária Kováčová', email: 'maria.kovacova@tuke.sk', status: 'active', completedExams: 1, totalExams: 3 },
+        { id: '3', name: 'Peter Horváth', email: 'peter.horvath@tuke.sk', status: 'active', completedExams: 3, totalExams: 3 }
+      ]
     },
     {
       id: '2',
@@ -33,7 +47,10 @@ export default function GroupManagement({ onClose }: GroupManagementProps) {
       time: '10:00-12:00',
       room: 'LAB-102',
       studentCount: 12,
-      students: ['4', '5']
+      students: [
+        { id: '4', name: 'Jana Malá', email: 'jana.mala@tuke.sk', status: 'active', completedExams: 2, totalExams: 3 },
+        { id: '5', name: 'Martin Veľký', email: 'martin.velky@tuke.sk', status: 'active', completedExams: 0, totalExams: 3 }
+      ]
     },
     {
       id: '3',
@@ -42,12 +59,18 @@ export default function GroupManagement({ onClose }: GroupManagementProps) {
       time: '16:00-18:00',
       room: 'LAB-101',
       studentCount: 18,
-      students: ['6', '7', '8']
+      students: [
+        { id: '6', name: 'Eva Nová', email: 'eva.nova@tuke.sk', status: 'active', completedExams: 1, totalExams: 3 },
+        { id: '7', name: 'Tomáš Starý', email: 'tomas.stary@tuke.sk', status: 'active', completedExams: 2, totalExams: 3 },
+        { id: '8', name: 'Lucia Mladá', email: 'lucia.mlada@tuke.sk', status: 'active', completedExams: 3, totalExams: 3 }
+      ]
     }
   ]);
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingGroup, setEditingGroup] = useState<LabGroup | null>(null);
+  const [viewingStudents, setViewingStudents] = useState<LabGroup | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     day: 'Monday',
@@ -56,6 +79,94 @@ export default function GroupManagement({ onClose }: GroupManagementProps) {
   });
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  // If viewing student detail, show that view
+  if (selectedStudentId) {
+    return (
+      <StudentDetailView 
+        studentId={selectedStudentId}
+        onBack={() => setSelectedStudentId(null)}
+      />
+    );
+  }
+
+  // If viewing students list for a group
+  if (viewingStudents) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setViewingStudents(null)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+          >
+            <ArrowLeft className="w-6 h-6 text-gray-700" />
+          </button>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{viewingStudents.name}</h2>
+            <p className="text-sm sm:text-base text-gray-600">
+              {viewingStudents.day} • {viewingStudents.time} • Room {viewingStudents.room}
+            </p>
+          </div>
+        </div>
+
+        {/* Students List */}
+        <div className="space-y-3">
+          {viewingStudents.students.map((student) => (
+            <div
+              key={student.id}
+              className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                {/* Student Info */}
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#E5A712] to-[#D4951A] rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-black font-bold text-lg">
+                      {student.name.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">{student.name}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{student.email}</p>
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${
+                        student.status === 'active' 
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {student.status === 'active' ? '✓ Aktívny' : 'Neaktívny'}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        Skúšky: <span className="font-bold">{student.completedExams}/{student.totalExams}</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* View Details Button */}
+                <button
+                  onClick={() => setSelectedStudentId(student.id)}
+                  className="px-4 py-2 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-lg hover:shadow-lg transition-all font-bold text-sm"
+                >
+                  Zobraziť detail
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {viewingStudents.students.length === 0 && (
+          <div className="text-center py-16">
+            <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Users className="w-10 h-10 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Žiadni študenti</h3>
+            <p className="text-gray-600">V tejto skupine zatiaľ nie sú žiadni študenti.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const handleCreate = () => {
     const newGroup: LabGroup = {
@@ -273,7 +384,10 @@ export default function GroupManagement({ onClose }: GroupManagementProps) {
                   <span className="text-xs sm:text-sm text-gray-600 font-semibold">Students enrolled</span>
                   <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{group.studentCount}</p>
                 </div>
-                <button className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-lg hover:shadow-lg transition-all font-bold text-sm">
+                <button
+                  onClick={() => setViewingStudents(group)}
+                  className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-lg hover:shadow-lg transition-all font-bold text-sm"
+                >
                   View Students
                 </button>
               </div>

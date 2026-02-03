@@ -1,4 +1,4 @@
-export type LoginResult = { token: string; username: string; role: 'student' | 'professor' };
+export type LoginResult = { token: string; username: string; role: 'student' | 'professor'; id?: number };
 
 export async function login(username: string, password: string, desiredRole?: 'student' | 'professor') : Promise<LoginResult> {
   const body: any = { username, password };
@@ -25,5 +25,9 @@ export async function login(username: string, password: string, desiredRole?: 's
   // backend already returns normalized role
   const role = data.role as LoginResult['role'];
   try { localStorage.setItem('auth-token', data.token); } catch (e) {}
-  return { token: data.token, username: data.username, role };
+  // store returned numeric id for downstream APIs
+  if (data.id !== undefined && data.id !== null) {
+    try { localStorage.setItem('user-id', String(data.id)); } catch (e) {}
+  }
+  return { token: data.token, username: data.username, role, id: data.id };
 }

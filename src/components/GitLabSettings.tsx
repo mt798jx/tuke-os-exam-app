@@ -9,14 +9,23 @@ export default function GitLabSettings() {
   const [isSaved, setIsSaved] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
-  // TODO: replace this with the real current user id from auth context
-  const USER_ID = 1;
+  // derive current user id from auth (stored on login)
+  const userId: number | undefined = (() => {
+    try {
+      const s = localStorage.getItem('user-id');
+      const n = s ? parseInt(s, 10) : NaN;
+      return Number.isFinite(n) ? n : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  })();
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
-        const creds = await gitlabApi.getCredentials(USER_ID);
+        if (!userId) return;
+        const creds = await gitlabApi.getCredentials(userId);
         if (!mounted) return;
         if (creds && (creds.gitlab_username || creds.gitlab_token)) {
           setGitlabUsername(creds.gitlab_username ?? '');
@@ -37,8 +46,13 @@ export default function GitLabSettings() {
       setTimeout(() => setSaveMessage(''), 3000);
       return;
     }
-    try {
-      await gitlabApi.saveCredentials(USER_ID, gitlabUsername, gitlabToken);
+      try {
+        if (!userId) {
+          setSaveMessage('Nie ste prihlásený');
+          setTimeout(() => setSaveMessage(''), 3000);
+          return;
+        }
+        await gitlabApi.saveCredentials(userId, gitlabUsername, gitlabToken);
       setIsSaved(true);
       setSaveMessage('Prihlasovacie údaje boli úspešne uložené');
       // notify other components that credentials changed
@@ -54,8 +68,13 @@ export default function GitLabSettings() {
   };
 
   const handleClear = async () => {
-    try {
-      await gitlabApi.deleteCredentials(USER_ID);
+      try {
+      if (!userId) {
+        setSaveMessage('Nie ste prihlásený');
+        setTimeout(() => setSaveMessage(''), 3000);
+        return;
+      }
+      await gitlabApi.deleteCredentials(userId);
       setGitlabUsername('');
       setGitlabToken('');
       setIsSaved(false);

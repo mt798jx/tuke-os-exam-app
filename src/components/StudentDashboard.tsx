@@ -110,8 +110,16 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
   const [examCards, setExamCards] = useState<ExamCard[]>(initialExamCards);
   const [projectsFocus, setProjectsFocus] = useState<string | null>(null);
 
-  // TODO: replace with auth context in future
-  const USER_ID = 1;
+  // derive current user id from auth (stored on login)
+  const userId: number | undefined = (() => {
+    try {
+      const s = localStorage.getItem('user-id');
+      const n = s ? parseInt(s, 10) : NaN;
+      return Number.isFinite(n) ? n : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  })();
 
   // Detect cloned repos and update projectConfigured status
   useEffect(() => {
@@ -119,8 +127,9 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
     
     const checkRepos = async () => {
       try {
+        if (!userId) return;
         const { getRepos } = await import('../lib/gitlabApi');
-        const repos = await getRepos(USER_ID);
+        const repos = await getRepos(userId);
         if (!mounted) return;
 
         // Normalize repo name for comparison

@@ -58,17 +58,25 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
   const [showToken, setShowToken] = useState(false);
   const [urlError, setUrlError] = useState('');
 
-  // TODO: replace with auth context in future
-  const USER_ID = 1;
+  // derive current user id from auth (stored on login)
+  const userId: number | undefined = (() => {
+    try {
+      const s = localStorage.getItem('user-id');
+      const n = s ? parseInt(s, 10) : NaN;
+      return Number.isFinite(n) ? n : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  })();
 
   // Load credentials and discover repos whenever the Projects view becomes active
   useEffect(() => {
     let mounted = true;
-    if (activeView !== 'projects') return;
+    if (activeView !== 'projects' || !userId) return;
     (async () => {
       try {
         const { getCredentials, getTree, getRepos } = await import('../lib/gitlabApi');
-        const creds = await getCredentials(USER_ID);
+        const creds = await getCredentials(userId);
         if (!mounted) return;
         if (creds && (creds.gitlab_username || creds.gitlab_token)) {
           setGitlabUsername(creds.gitlab_username ?? '');
@@ -78,7 +86,7 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
         // Discover repos on the server and map them to our initial projects.
         let newProjects = [...initialProjects];
         let firstReadySelected: Project | null = null;
-        const repos = await getRepos(USER_ID); // [{name, path}, ...]
+        const repos = await getRepos(userId); // [{name, path}, ...]
         const checks = await Promise.all(repos.map(async (r: any) => {
           try {
             const tree = await getTree(r.name);
@@ -195,11 +203,11 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
     }
 
     // Save credentials to backend if checkbox is checked
-    try {
-      const gitlabApi = (await import('../lib/gitlabApi')).default;
-      if (rememberCredentials) {
-        await gitlabApi.saveCredentials(USER_ID, gitlabUsername, gitlabToken);
-      }
+      try {
+        const gitlabApi = (await import('../lib/gitlabApi')).default;
+        if (rememberCredentials && userId) {
+          await gitlabApi.saveCredentials(userId, gitlabUsername, gitlabToken);
+        }
 
       // mark project cloning
       const updatedProjects = projects.map(p =>
@@ -209,7 +217,7 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
       setSelectedProject(updatedProjects.find(p => p.id === selectedProject.id)!);
 
       // call backend to clone
-      const res = await gitlabApi.cloneRepo(gitlabUrl, rememberCredentials ? undefined : gitlabUsername, rememberCredentials ? undefined : gitlabToken, USER_ID);
+      const res = await gitlabApi.cloneRepo(gitlabUrl, rememberCredentials ? undefined : gitlabUsername, rememberCredentials ? undefined : gitlabToken, userId);
 
       const clonedFiles: FileNode[] = res.files ?? [];
 
@@ -222,7 +230,7 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
               lastSync: res.lastSync ?? new Date().toISOString(),
               branch: res.branch ?? 'main',
               files: clonedFiles,
-              repoPath: `${USER_ID}/${res.repo_name}`,
+              repoPath: `${userId ?? 'unknown'}/${res.repo_name}`,
               repoFolder: res.repo_name,
             }
           : p
@@ -619,7 +627,11 @@ export default function ProjectBrowser({ onNavigate, activeView, focusType }: { 
                     try {
                       const { deleteRepo } = await import('../lib/gitlabApi');
                       const repoNameToDelete = selectedProject.repoFolder ?? (selectedProject.repoPath ? String(selectedProject.repoPath).split('/').pop() : selectedProject.name);
-                      await deleteRepo(USER_ID, repoNameToDelete ?? selectedProject.name);
+                       if (userId) {
+                        await deleteRepo(userId, repoNameToDelete ?? selectedProject.name);
+                      } else {
+                        console.warn('No user id available, skipping server-side delete');
+                      }
                     } catch (err: any) {
                       // show error briefly (for now, console)
                       console.error('Failed to delete repo', err);

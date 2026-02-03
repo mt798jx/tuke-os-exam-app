@@ -4,7 +4,7 @@ type Credentials = {
   gitlab_token?: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const API_BASE = import.meta.env.VITE_GITLAB_BROWSER_API ?? '';
 
 export async function saveCredentials(userId: number, username: string, token: string) {
   const res = await fetch(`${API_BASE}/credentials`, {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { GraduationCap, Users, Code2, ArrowRight, Sparkles, Shield, Lock } from 'lucide-react';
 
 interface WelcomePageProps {
-  onLogin: (role: 'student' | 'professor', name: string, email: string) => void;
+  onLogin: (role: 'student' | 'professor', name: string) => void;
 }
 
 export default function WelcomePage({ onLogin }: WelcomePageProps) {
@@ -15,21 +15,33 @@ export default function WelcomePage({ onLogin }: WelcomePageProps) {
 
   const handleLogin = async () => {
     setError('');
-    
+
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password');
       return;
     }
 
     setIsLoading(true);
-    
-    // Simulate API call - replace with actual Tuke Auth
-    setTimeout(() => {
-      // Mock successful login
-      const mockName = selectedRole === 'student' ? 'Alex Chen' : 'Dr. Sarah Mitchell';
-      onLogin(selectedRole!, mockName, email);
+    try {
+      const { login } = await import('../lib/professorApi');
+      const result = await login(email.trim(), password, selectedRole === 'professor' ? 'professor' : 'student');
+      // role from backend normalized to 'professor'|'student'
+      if (selectedRole === 'student' && result.role !== 'student') {
+        setError('Logged-in account is not a student');
+        setIsLoading(false);
+        return;
+      }
+      if (selectedRole === 'professor' && result.role !== 'professor') {
+        setError('Logged-in account is not a professor');
+        setIsLoading(false);
+        return;
+      }
+      onLogin(selectedRole!, result.username);
+    } catch (err: any) {
+      setError(err?.message || 'Login failed');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

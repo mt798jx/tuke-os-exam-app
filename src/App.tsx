@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import WelcomePage from './components/WelcomePage';
 import StudentDashboard from './components/StudentDashboard';
 import ProgrammingExam from './components/ProgrammingExam';
@@ -38,14 +38,35 @@ export default function App() {
   const handleLogin = (role: 'student' | 'professor', name: string) => {
     setUserRole(role);
     setUserName(name);
+    try {
+      localStorage.setItem('user-role', role);
+      localStorage.setItem('user-name', name);
+    } catch (e) {}
     setCurrentView(role === 'student' ? 'dashboard' : 'professor');
   };
+
+  // persist role/name so reloads keep the user logged in
+  useEffect(() => {
+    const token = localStorage.getItem('auth-token');
+    const role = (localStorage.getItem('user-role') as UserRole) || null;
+    const name = localStorage.getItem('user-name') || '';
+    if (token && role) {
+      setUserRole(role);
+      setUserName(name);
+      setCurrentView(role === 'student' ? 'dashboard' : 'professor');
+    }
+  }, []);
 
   const handleLogout = () => {
     setUserRole(null);
     setUserName('');
     setActiveExam(null);
     setCurrentView('welcome');
+    try {
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('user-role');
+      localStorage.removeItem('user-name');
+    } catch (e) {}
   };
 
   const handleStartExam = (examType: ExamMode) => {

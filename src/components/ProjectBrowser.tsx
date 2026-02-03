@@ -46,7 +46,7 @@ const initialProjects: Project[] = [
 
 type NavView = 'exams' | 'grades' | 'projects' | 'settings';
 
-export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?: (view: NavView) => void, activeView?: NavView } ) {
+export default function ProjectBrowser({ onNavigate, activeView, focusType }: { onNavigate?: (view: NavView) => void, activeView?: NavView, focusType?: string | null } ) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [selectedProject, setSelectedProject] = useState<Project>(initialProjects[0]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'include']));
@@ -152,6 +152,18 @@ export default function ProjectBrowser({ onNavigate, activeView }: { onNavigate?
       window.removeEventListener('gitlabCredentialsChanged', handler as EventListener);
     };
   }, []);
+
+  // If parent requests focus on a specific project type/id, select it
+  useEffect(() => {
+    if (!focusType) return;
+    // try find by type or id
+    const found = projects.find(p => p.type === focusType || p.id === focusType || p.displayName === focusType || p.name === focusType);
+    if (found) {
+      setSelectedProject(found);
+      setSelectedFile(null);
+      setExpandedFolders(new Set(['src', 'include']));
+    }
+  }, [focusType]);
 
   const validateGitLabUrl = (url: string): boolean => {
     // Check if URL is a valid GitLab URL

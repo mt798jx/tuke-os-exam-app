@@ -1,33 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Send, Loader2, BookOpen, CheckCircle2, Clock, Menu } from 'lucide-react';
 import { Question, Answer } from '../App';
+import { getExams } from '../lib/examApi';
 
 interface ClassicExamProps {
   onExit: () => void;
 }
-
-const classicQuestions: Question[] = [
-  {
-    id: 'q1',
-    text: 'Explain the difference between a process and a thread. In what scenarios would you choose to use multiple threads within a single process rather than creating multiple processes?'
-  },
-  {
-    id: 'q2',
-    text: 'Describe how virtual memory works. What is the role of the page table, and what happens during a page fault? Explain the benefits of virtual memory for both the operating system and application programs.'
-  },
-  {
-    id: 'q3',
-    text: 'What is a deadlock? Describe the four necessary conditions for deadlock to occur. Choose one of these conditions and explain a practical strategy an operating system can use to prevent deadlocks by breaking that condition.'
-  },
-  {
-    id: 'q4',
-    text: 'Compare and contrast the different CPU scheduling algorithms: First-Come-First-Served (FCFS), Shortest Job First (SJF), and Round Robin. What are the advantages and disadvantages of each? Which algorithm would be best for an interactive system and why?'
-  },
-  {
-    id: 'q5',
-    text: 'Explain the concept of inter-process communication (IPC). Compare shared memory and message passing as IPC mechanisms. Based on your IPC and CopyMaster assignments, describe a situation where you would prefer one method over the other.'
-  }
-];
 
 type ExamPhase = 'ready' | 'in-progress' | 'completed';
 
@@ -39,11 +17,14 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [evaluationFeedback, setEvaluationFeedback] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
 
-  const currentQuestion = classicQuestions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / classicQuestions.length) * 100;
+  const currentQuestion = questions[questions.length > 0 ? currentQuestionIndex : -1];
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
 
   const handleStartExam = () => {
+    if (questions.length === 0) return;
     setPhase('in-progress');
   };
 
@@ -77,6 +58,8 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
   const handleSubmitAnswer = () => {
     if (!currentAnswer.trim()) return;
 
+    if (!currentQuestion) return;
+
     const evaluation = evaluateAnswer(currentAnswer);
     
     const newAnswer: Answer = {
@@ -95,13 +78,37 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
       setCurrentAnswer('');
       setEvaluationFeedback('');
       
-      if (currentQuestionIndex < classicQuestions.length - 1) {
+      if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
         setPhase('completed');
       }
     }, 4000);
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const exams = await getExams();
+        const classic = exams.find(e => e.id === 'classic' || e.type === 'classic');
+        if (!mounted) return;
+        if (classic && classic.customQuestions && classic.customQuestions.length > 0) {
+          setQuestions(classic.customQuestions.map(q => ({ id: q.id, text: q.text })));
+          setCurrentQuestionIndex(0);
+        } else {
+          // no questions from backend — keep empty list
+          setQuestions([]);
+        }
+      } catch (e) {
+        // silently keep defaults on error
+        console.error('Failed to load classic questions', e);
+      } finally {
+        if (mounted) setLoadingQuestions(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   if (phase === 'ready') {
     return (
@@ -114,7 +121,7 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Classic Oral Examination 📚</h2>
               <p className="text-base sm:text-lg text-gray-600">
-                Answer {classicQuestions.length} theory questions about Operating Systems
+                {loadingQuestions ? 'Loading questions…' : `Answer ${questions.length} theory questions about Operating Systems`}
               </p>
             </div>
 
@@ -153,7 +160,7 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
 
             <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
               <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{classicQuestions.length}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{questions.length}</div>
                 <div className="text-xs sm:text-sm text-gray-600">Questions</div>
               </div>
               <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center">
@@ -165,7 +172,8 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
                 onClick={handleStartExam}
-                className="flex-1 py-3 sm:py-4 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-xl font-bold hover:shadow-lg transition-all"
+                disabled={loadingQuestions || questions.length === 0}
+                className={`flex-1 py-3 sm:py-4 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-xl font-bold hover:shadow-lg transition-all ${loadingQuestions || questions.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 Begin Examination
               </button>
@@ -194,9 +202,9 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
               <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">Examination Complete! 🎉</h2>
-            <p className="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-8">
-              You've successfully answered all {classicQuestions.length} theory questions.
-            </p>
+              <p className="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-8">
+                You've successfully answered all {questions.length} theory questions.
+              </p>
 
             <div className="bg-gradient-to-br from-[#E5A712]/20 to-[#D4951A]/20 rounded-2xl p-6 sm:p-8 mb-6 sm:mb-8">
               <div className="text-5xl sm:text-7xl font-bold text-[#E5A712] mb-2">{grade}</div>
@@ -206,7 +214,7 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
 
             <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
               <div className="bg-white border-2 border-gray-200 rounded-xl p-4 sm:p-6">
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{classicQuestions.length}/{classicQuestions.length}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{questions.length}/{questions.length}</div>
                 <div className="text-xs sm:text-sm text-gray-600">Questions Answered</div>
               </div>
               <div className="bg-white border-2 border-gray-200 rounded-xl p-4 sm:p-6">
@@ -248,7 +256,7 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-black text-sm sm:text-base truncate">Classic Oral Examination</h1>
-              <p className="text-xs text-black/70">Question {currentQuestionIndex + 1} of {classicQuestions.length}</p>
+              <p className="text-xs text-black/70">Question {currentQuestionIndex + 1} of {questions.length}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -375,7 +383,7 @@ export default function ClassicExam({ onExit }: ClassicExamProps) {
           </div>
           
           <div className="space-y-2 mb-6">
-            {classicQuestions.map((q, idx) => (
+            {questions.map((q, idx) => (
               <div
                 key={q.id}
                 className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${

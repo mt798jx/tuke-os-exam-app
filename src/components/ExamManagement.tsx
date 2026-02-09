@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Lock, Unlock, Save, ArrowLeft, MessageSquare, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Lock, Unlock, ArrowLeft, MessageSquare, X } from 'lucide-react';
 import * as examApi from '../lib/examApi';
 
 interface ExamConfig {
@@ -278,17 +278,6 @@ export default function ExamManagement({ onClose }: ExamManagementProps) {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="border-t-2 border-gray-200 p-6 sm:p-8 bg-gray-50 flex-shrink-0">
-            <button
-              onClick={closeQuestionManager}
-              className="w-full px-6 py-3 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-xl font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2"
-            >
-              <Save className="w-5 h-5" />
-              Done
-            </button>
           </div>
         </div>
       </div>

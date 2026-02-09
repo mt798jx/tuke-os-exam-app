@@ -11,7 +11,7 @@ interface StudentDashboardProps {
   userName: string;
 }
 
-type ExamStatus = 'ready' | 'analyzing' | 'in-progress' | 'completed' | 'disabled';
+type ExamStatus = 'ready' | 'ready-to-analyze' | 'analyzing' | 'in-progress' | 'completed' | 'disabled';
 type ActiveView = 'exams' | 'grades' | 'projects' | 'settings';
 
 interface ExamCard {
@@ -70,6 +70,11 @@ const StatusBadge = ({ status, score }: { status: ExamStatus; score?: string }) 
       text: 'Ready to Start',
       className: 'bg-green-50 text-green-700 border-green-300'
     },
+    'ready-to-analyze': {
+      icon: GitBranch,
+      text: 'Ready to Analyze',
+      className: 'bg-amber-50 text-amber-700 border-amber-300'
+    },
     'analyzing': {
       icon: Loader2,
       text: 'AI Analyzing...',
@@ -124,7 +129,9 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
   // Detect cloned repos and update projectConfigured status
   useEffect(() => {
     let mounted = true;
-    
+
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
     const checkRepos = async () => {
       try {
         if (!userId) return;
@@ -132,45 +139,64 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
         const repos = await getRepos(userId);
         if (!mounted) return;
 
-        // Normalize repo name for comparison
-        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-        
-        // Update exam cards based on detected repos
-        const updatedCards = initialExamCards.map(card => {
-          if (!card.requiresProject) return card;
-          
-          // Check if we have a matching repo for this exam type
-          const hasMatchingRepo = repos.some((repo: any) => {
-            const repoName = normalize(String(repo.name));
-            const cardType = normalize(String(card.id));
-            return repoName.includes(cardType) || cardType.includes(repoName);
-          });
-          
-          return { ...card, projectConfigured: hasMatchingRepo };
-        });
-        
-        setExamCards(updatedCards);
+        // Update exam cards based on detected repos but keep other fields intact
+        setExamCards(prev => prev.map(card => {
+              if (!card.requiresProject) return card;
+
+              const hasMatchingRepo = repos.some((repo: any) => {
+                const repoName = normalize(String(repo.name));
+                const cardType = normalize(String(card.id));
+                return repoName.includes(cardType) || cardType.includes(repoName);
+              });
+
+              // Determine new status without clobbering existing progress
+              let newStatus: ExamStatus = card.status;
+
+              if (hasMatchingRepo) {
+                if (card.status === 'analyzing') {
+                  newStatus = 'analyzing';
+                } else if (card.status === 'in-progress' || card.status === 'completed' || card.status === 'ready') {
+                  newStatus = card.status;
+                } else {
+                  // project is configured but not yet analyzed
+                  newStatus = 'ready-to-analyze';
+                }
+              } else {
+                // project missing -> disable unless user is mid-exam or already completed
+                if (card.status === 'in-progress' || card.status === 'completed') {
+                  newStatus = card.status;
+                } else {
+                  newStatus = 'disabled';
+                }
+              }
+
+              return { ...card, projectConfigured: hasMatchingRepo, status: newStatus };
+            }));
       } catch (e) {
         // Ignore errors - will show not configured
       }
     };
-    
-    // Check on mount
-    checkRepos();
-    
-    // Listen for repo clone/delete events and re-check
+
+    // Run check when mounted and whenever we return to the exams view
+    if (activeView === 'exams') checkRepos();
+
+    // Re-check on repo events. Attach listeners on both window and document
     const handleRepoChange = () => {
       checkRepos();
     };
     window.addEventListener('repoCloned', handleRepoChange);
     window.addEventListener('repoDeleted', handleRepoChange);
-    
+    document.addEventListener('repoCloned', handleRepoChange);
+    document.addEventListener('repoDeleted', handleRepoChange);
+
     return () => { 
       mounted = false;
       window.removeEventListener('repoCloned', handleRepoChange);
       window.removeEventListener('repoDeleted', handleRepoChange);
+      document.removeEventListener('repoCloned', handleRepoChange);
+      document.removeEventListener('repoDeleted', handleRepoChange);
     };
-  }, []);
+  }, [activeView, userId]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -492,6 +518,7 @@ export default function StudentDashboard({ onStartExam, onLogout, userName }: St
                             {exam.status === 'in-progress' ? 'Continue Exam' : 
                              exam.status === 'analyzing' ? 'Please Wait...' : 
                              exam.status === 'completed' ? 'Review Exam' : 
+                             exam.status === 'ready-to-analyze' ? 'Analyze Project' :
                              exam.status === 'disabled' ? 'Unavailable' : 'Start Exam'}
                           </button>
                         )}

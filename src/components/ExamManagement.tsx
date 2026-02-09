@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Lock, Unlock, Save, ArrowLeft, MessageSquare, X } from 'lucide-react';
+import * as examApi from '../lib/examApi';
 
 interface ExamConfig {
   id: string;
   name: string;
   type: 'ipc' | 'copymaster' | 'classic';
   enabled: boolean;
-  availableFrom?: Date;
-  availableUntil?: Date;
+  // store `datetime-local` values as local strings (e.g. "2026-02-09T20:03")
+  availableFrom?: string;
+  availableUntil?: string;
   customQuestions?: CustomQuestion[];
 }
 
@@ -22,42 +24,79 @@ interface ExamManagementProps {
 }
 
 export default function ExamManagement({ onClose }: ExamManagementProps) {
-  const [exams, setExams] = useState<ExamConfig[]>([
-    {
-      id: '1',
-      name: 'IPC Programming Assignment',
-      type: 'ipc',
-      enabled: true,
-      availableFrom: new Date(),
-      availableUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: '2',
-      name: 'CopyMaster Programming Assignment',
-      type: 'copymaster',
-      enabled: false,
-      availableFrom: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: '3',
-      name: 'Classic Oral Exam',
-      type: 'classic',
-      enabled: false,
-      customQuestions: [
-        { id: '1', text: 'Explain the difference between a process and a thread.', type: 'theory' },
-        { id: '2', text: 'What is virtual memory and how does it work?', type: 'theory' }
-      ]
+  const [exams, setExams] = useState<ExamConfig[]>([]);
+
+  useEffect(() => { fetchExams(); }, []);
+
+  const fetchExams = async () => {
+    try {
+      const data = await examApi.getExams();
+      const mapped: ExamConfig[] = data.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        enabled: !!e.enabled,
+        availableFrom: e.availableFrom ? e.availableFrom.slice(0, 16) : undefined,
+        availableUntil: e.availableUntil ? e.availableUntil.slice(0, 16) : undefined,
+        customQuestions: e.customQuestions?.map((q: any) => ({ id: q.id, text: q.text, type: q.type === 'code-specific' ? 'code-specific' : 'theory' }))
+      }));
+      setExams(mapped);
+    } catch (err) {
+      console.error('Failed to fetch exams', err);
     }
-  ]);
+  };
+
+  const updateExamOnServer = async (examId: string, patch: any) => {
+    try {
+      const updated = await examApi.updateExam(examId, patch);
+      setExams(prev => prev.map(ex => ex.id === updated.id ? { ...ex, ...{
+        enabled: updated.enabled,
+        availableFrom: updated.availableFrom ? updated.availableFrom.slice(0,16) : undefined,
+        availableUntil: updated.availableUntil ? updated.availableUntil.slice(0,16) : undefined,
+        customQuestions: updated.customQuestions?.map((q: any) => ({ id: q.id, text: q.text, type: q.type === 'code-specific' ? 'code-specific' : 'theory' }))
+      }} : ex));
+    } catch (err) {
+      console.error('Failed to update exam', err);
+    }
+  };
+
+  const addQuestionOnServer = async (examId: string, payload: { text: string; type: string }) => {
+    try {
+      return await examApi.addQuestion(examId, payload);
+    } catch (err) {
+      console.error('Failed to add question', err);
+      return null;
+    }
+  };
+
+  const updateQuestionOnServer = async (examId: string, questionId: string, payload: { text?: string; type?: string }) => {
+    try {
+      return await examApi.updateQuestion(examId, questionId, payload);
+    } catch (err) {
+      console.error('Failed to update question', err);
+      return null;
+    }
+  };
+
+  const deleteQuestionOnServer = async (examId: string, questionId: string) => {
+    try {
+      return await examApi.deleteQuestion(examId, questionId);
+    } catch (err) {
+      console.error('Failed to delete question', err);
+      return false;
+    }
+  };
 
   const [managingQuestionsFor, setManagingQuestionsFor] = useState<ExamConfig | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<CustomQuestion | null>(null);
   const [questionText, setQuestionText] = useState('');
 
   const toggleExamAccess = (examId: string) => {
-    setExams(exams.map(exam => 
-      exam.id === examId ? { ...exam, enabled: !exam.enabled } : exam
-    ));
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) return;
+    const newEnabled = !exam.enabled;
+    setExams(exams.map(ex => ex.id === examId ? { ...ex, enabled: newEnabled } : ex));
+    updateExamOnServer(examId, { enabled: newEnabled });
   };
 
   const openQuestionManager = (exam: ExamConfig) => {
@@ -75,47 +114,40 @@ export default function ExamManagement({ onClose }: ExamManagementProps) {
   const addQuestion = () => {
     if (!questionText.trim() || !managingQuestionsFor) return;
 
-    const newQuestion: CustomQuestion = {
-      id: Date.now().toString(),
-      text: questionText,
-      type: 'theory'
-    };
-
-    setExams(exams.map(exam =>
-      exam.id === managingQuestionsFor.id
-        ? { ...exam, customQuestions: [...(exam.customQuestions || []), newQuestion] }
-        : exam
-    ));
-
-    setQuestionText('');
+    (async () => {
+      const resp = await addQuestionOnServer(managingQuestionsFor.id, { text: questionText, type: 'theory' });
+      if (resp) {
+        const newQuestion: CustomQuestion = { id: resp.id, text: resp.text, type: resp.type || 'theory' };
+        setExams(exams.map(exam => exam.id === managingQuestionsFor.id ? { ...exam, customQuestions: [...(exam.customQuestions || []), newQuestion] } : exam));
+        setQuestionText('');
+      }
+    })();
   };
 
   const updateQuestion = () => {
     if (!questionText.trim() || !editingQuestion || !managingQuestionsFor) return;
-
-    setExams(exams.map(exam =>
-      exam.id === managingQuestionsFor.id
-        ? {
-            ...exam,
-            customQuestions: exam.customQuestions?.map(q =>
-              q.id === editingQuestion.id ? { ...q, text: questionText } : q
-            )
-          }
-        : exam
-    ));
-
-    setEditingQuestion(null);
-    setQuestionText('');
+    (async () => {
+      const resp = await updateQuestionOnServer(managingQuestionsFor.id, editingQuestion.id, { text: questionText });
+      if (resp) {
+        setExams(exams.map(exam =>
+          exam.id === managingQuestionsFor.id
+            ? { ...exam, customQuestions: exam.customQuestions?.map(q => q.id === editingQuestion.id ? { ...q, text: resp.text } : q) }
+            : exam
+        ));
+        setEditingQuestion(null);
+        setQuestionText('');
+      }
+    })();
   };
 
   const deleteQuestion = (questionId: string) => {
     if (!managingQuestionsFor) return;
-    
-    setExams(exams.map(exam =>
-      exam.id === managingQuestionsFor.id
-        ? { ...exam, customQuestions: exam.customQuestions?.filter(q => q.id !== questionId) }
-        : exam
-    ));
+    (async () => {
+      const ok = await deleteQuestionOnServer(managingQuestionsFor.id, questionId);
+      if (ok) {
+        setExams(exams.map(exam => exam.id === managingQuestionsFor.id ? { ...exam, customQuestions: exam.customQuestions?.filter(q => q.id !== questionId) } : exam));
+      }
+    })();
   };
 
   const startEditQuestion = (question: CustomQuestion) => {
@@ -323,13 +355,11 @@ export default function ExamManagement({ onClose }: ExamManagementProps) {
                     </label>
                     <input
                       type="datetime-local"
-                      value={exam.availableFrom ? new Date(exam.availableFrom).toISOString().slice(0, 16) : ''}
+                      value={exam.availableFrom || ''}
                       onChange={(e) => {
-                        setExams(exams.map(ex =>
-                          ex.id === exam.id
-                            ? { ...ex, availableFrom: new Date(e.target.value) }
-                            : ex
-                        ));
+                        const val = e.target.value ? e.target.value : null;
+                        setExams(exams.map(ex => ex.id === exam.id ? { ...ex, availableFrom: val ? val : undefined } : ex));
+                        updateExamOnServer(exam.id, { availableFrom: val });
                       }}
                       className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A712] focus:border-transparent"
                     />
@@ -340,13 +370,11 @@ export default function ExamManagement({ onClose }: ExamManagementProps) {
                     </label>
                     <input
                       type="datetime-local"
-                      value={exam.availableUntil ? new Date(exam.availableUntil).toISOString().slice(0, 16) : ''}
+                      value={exam.availableUntil || ''}
                       onChange={(e) => {
-                        setExams(exams.map(ex =>
-                          ex.id === exam.id
-                            ? { ...ex, availableUntil: new Date(e.target.value) }
-                            : ex
-                        ));
+                        const val = e.target.value ? e.target.value : null;
+                        setExams(exams.map(ex => ex.id === exam.id ? { ...ex, availableUntil: val ? val : undefined } : ex));
+                        updateExamOnServer(exam.id, { availableUntil: val });
                       }}
                       className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A712] focus:border-transparent"
                     />
@@ -385,23 +413,6 @@ export default function ExamManagement({ onClose }: ExamManagementProps) {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t-2 border-gray-200">
-        <button
-          onClick={onClose}
-          className="w-full sm:w-auto px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onClose}
-          className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#E5A712] to-[#D4951A] text-black rounded-xl font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2"
-        >
-          <Save className="w-5 h-5" />
-          Save Changes
-        </button>
       </div>
     </div>
   );
